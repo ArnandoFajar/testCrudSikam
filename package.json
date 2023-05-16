@@ -1,0 +1,17 @@
+{
+  "name": "test Crud Sikam",
+  "version": "1.0.0",
+  "description": "Soal Interview Lahan Sikam",
+  "main": "server/index.js",
+  "author": "Arnando Fajar Sidhiq",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "moment": "^2.29.4",
+    "mysql": "^2.18.1"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "server": "node server/index.js"
+  }
+}
