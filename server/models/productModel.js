@@ -5,6 +5,7 @@ const Product = function (product) {
   this.name = product.name;
   this.description = product.description;
   this.salesprice = product.salesprice;
+  this.stock = product.stock;
   this.created_at = product.created_at;
   this.modified_at = product.modified_at;
 };
@@ -23,25 +24,28 @@ Product.create = (newProduct, result) => {
 };
 
 Product.getById = (id, result) => {
-  sql.query(`SELECT * FROM product WHERE id = ${id}`, (err, res) => {
-    if (err) {
-      console.log("error: ", err);
-      result(err, null);
-      return;
-    }
+  sql.query(
+    `SELECT id,name,description,salesprice,stock FROM product WHERE id = ${id}`,
+    (err, res) => {
+      if (err) {
+        console.log("error: ", err);
+        result(err, null);
+        return;
+      }
 
-    if (res.length) {
-      console.log("ditemukan: ", res[0]);
-      result(null, res[0]);
-      return;
-    }
+      if (res.length) {
+        console.log("ditemukan: ", res[0]);
+        result(null, res[0]);
+        return;
+      }
 
-    result({ kind: "not_found" }, null);
-  });
+      result({ kind: "not_found" }, null);
+    }
+  );
 };
 
 Product.getAll = (name, result) => {
-  let query = "SELECT id,name,description,salesprice FROM product";
+  let query = "SELECT id,name,description,salesprice,stock FROM product";
 
   if (name) {
     query += ` WHERE name LIKE '%${name}%'`;
@@ -61,11 +65,12 @@ Product.getAll = (name, result) => {
 
 Product.updateById = (id, product, result) => {
   sql.query(
-    "UPDATE product SET name = ?, description = ?, salesprice = ?, modified_at = ? WHERE id = ?",
+    "UPDATE product SET name = ?, description = ?, salesprice = ?, stock = ?, modified_at = ? WHERE id = ?",
     [
       product.title,
       product.description,
       product.salesprice,
+      product.stock,
       product.modified_at,
       id,
     ],
