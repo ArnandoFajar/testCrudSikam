@@ -1,5 +1,5 @@
 {
-  "name": "test Crud Sikam",
+  "name": "testcrudsikam",
   "version": "1.0.0",
   "description": "Soal Interview Lahan Sikam",
   "main": "server/index.js",

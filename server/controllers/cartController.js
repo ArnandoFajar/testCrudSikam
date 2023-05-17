@@ -35,18 +35,24 @@ exports.add = (req, res) => {
 
   //insert Cart to database
   CartModel.create(cart, (err, data) => {
-    if (err)
-      return res.status(500).send({
-        message: err.message || "Terjadi Error saat insert Data Keranjang",
-      });
-    else
+    if (err) {
+      if (err.kind === "stok_kurang") {
+        return res.status(400).send({
+          message: `Stok produk tidak cukup`,
+        });
+      } else {
+        return res.status(500).send({
+          message: err.message || "Terjadi Error saat insert Data Keranjang",
+        });
+      }
+    } else
       return res.status(200).send({
         message: "Data Keranjang berhasil ditambah",
         data: data,
       });
   });
 };
-exports.getAll = (res) => {
+exports.getAll = (req, res) => {
   CartModel.getAll((err, data) => {
     if (err)
       return res.status(500).send({
@@ -114,7 +120,7 @@ exports.update = (req, res) => {
     } else return res.send({ message: "Data berhasil diubah", data: data });
   });
 };
-exports.deleteById = (req, res) => {
+exports.delete = (req, res) => {
   CartModel.delete(req.params.id, (err, data) => {
     if (err) {
       if (err.kind === "not_found") {

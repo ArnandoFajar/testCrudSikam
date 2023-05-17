@@ -9,15 +9,22 @@ const Cart = function (cart) {
 };
 
 Cart.create = (newCart, result) => {
-  sql.query("INSERT INTO product SET ?", newCart, (err, res) => {
-    if (err) {
-      console.log("error: ", err);
-      result(err, null);
+  //check stock on product by productid
+  getStock(newCart, (hasilstok) => {
+    if (hasilstok < newCart.quantity) {
+      result({ kind: "stok_kurang" }, null);
       return;
     }
+    sql.query("INSERT INTO cart SET ?", newCart, (err, res) => {
+      if (err) {
+        console.log("error: ", err);
+        result(err, null);
+        return;
+      }
 
-    console.log("created cart: ", { id: res.insertId, ...newCart });
-    result(null, { id: res.insertId, ...newCart });
+      console.log("created cart: ", { id: res.insertId, ...newCart });
+      result(null, { id: res.insertId, ...newCart });
+    });
   });
 };
 
@@ -44,7 +51,7 @@ Cart.getById = (id, result) => {
 
 Cart.getAll = (result) => {
   let query =
-    "SELECT id,productid,product.name AS name,quantity FROM cart JOIN product ON cart.productid = product.id";
+    "SELECT cart.id,productid,product.name AS name,quantity FROM cart JOIN product ON cart.productid = product.id";
 
   sql.query(query, (err, res) => {
     if (err) {
@@ -108,6 +115,21 @@ Cart.deleteAll = (result) => {
     console.log(`deleted ${res.affectedRows} Cart`);
     result(null, res);
   });
+};
+
+//add query
+const getStock = (param, result) => {
+  sql.query(
+    "SELECT stock from product where id= ?",
+    param.productid,
+    (err, res) => {
+      if (err) {
+        console.log("error: ", err);
+        result(err, null);
+      }
+      result(res[0].stock);
+    }
+  );
 };
 
 module.exports = Cart;

@@ -67,7 +67,7 @@ Product.updateById = (id, product, result) => {
   sql.query(
     "UPDATE product SET name = ?, description = ?, salesprice = ?, stock = ?, modified_at = ? WHERE id = ?",
     [
-      product.title,
+      product.name,
       product.description,
       product.salesprice,
       product.stock,
