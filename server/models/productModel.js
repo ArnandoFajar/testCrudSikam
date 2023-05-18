@@ -13,12 +13,10 @@ const Product = function (product) {
 Product.create = (newProduct, result) => {
   sql.query("INSERT INTO product SET ?", newProduct, (err, res) => {
     if (err) {
-      console.log("error: ", err);
       result(err, null);
       return;
     }
 
-    console.log("created produk: ", { id: res.insertId, ...newProduct });
     result(null, { id: res.insertId, ...newProduct });
   });
 };
@@ -28,13 +26,11 @@ Product.getById = (id, result) => {
     `SELECT id,name,description,salesprice,stock FROM product WHERE id = ${id}`,
     (err, res) => {
       if (err) {
-        console.log("error: ", err);
         result(err, null);
         return;
       }
 
       if (res.length) {
-        console.log("ditemukan: ", res[0]);
         result(null, res[0]);
         return;
       }
@@ -53,12 +49,10 @@ Product.getAll = (name, result) => {
 
   sql.query(query, (err, res) => {
     if (err) {
-      console.log("error: ", err);
-      result(null, err);
+      result(err, null);
       return;
     }
 
-    console.log("produk: ", res);
     result(null, res);
   });
 };
@@ -76,7 +70,6 @@ Product.updateById = (id, product, result) => {
     ],
     (err, res) => {
       if (err) {
-        console.log("error: ", err);
         result(null, err);
         return;
       }
@@ -86,7 +79,6 @@ Product.updateById = (id, product, result) => {
         return;
       }
 
-      console.log("Produk Updated: ", { id: id, ...product });
       result(null, { id: id, ...product });
     }
   );
@@ -95,7 +87,6 @@ Product.updateById = (id, product, result) => {
 Product.delete = (id, result) => {
   sql.query("DELETE FROM product WHERE id = ?", id, (err, res) => {
     if (err) {
-      console.log("error: ", err);
       result(null, err);
       return;
     }
@@ -105,7 +96,6 @@ Product.delete = (id, result) => {
       return;
     }
 
-    console.log("Hapus produk by id: ", id);
     result(null, res);
   });
 };

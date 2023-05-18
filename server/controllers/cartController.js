@@ -40,13 +40,17 @@ exports.add = (req, res) => {
         return res.status(400).send({
           message: `Stok produk tidak cukup`,
         });
+      } else if (err.kind === "not_found_product") {
+        return res.status(400).send({
+          message: `Product tidak ditemukan`,
+        });
       } else {
         return res.status(500).send({
           message: err.message || "Terjadi Error saat insert Data Keranjang",
         });
       }
     } else
-      return res.status(200).send({
+      return res.send({
         message: "Data Keranjang berhasil ditambah",
         data: data,
       });

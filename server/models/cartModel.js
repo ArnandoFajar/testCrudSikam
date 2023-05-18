@@ -10,19 +10,24 @@ const Cart = function (cart) {
 
 Cart.create = (newCart, result) => {
   //check stock on product by productid
-  getStock(newCart, (hasilstok) => {
+  getStock(newCart, (errHasilStock, hasilstok) => {
+    if (errHasilStock) {
+      result(errHasilStock, null);
+      return;
+    }
+    if (hasilstok.kind === "not_found") {
+      result({ kind: "not_found_product" }, null);
+      return;
+    }
     if (hasilstok < newCart.quantity) {
       result({ kind: "stok_kurang" }, null);
       return;
     }
     sql.query("INSERT INTO cart SET ?", newCart, (err, res) => {
       if (err) {
-        console.log("error: ", err);
         result(err, null);
         return;
       }
-
-      console.log("created cart: ", { id: res.insertId, ...newCart });
       result(null, { id: res.insertId, ...newCart });
     });
   });
@@ -30,16 +35,14 @@ Cart.create = (newCart, result) => {
 
 Cart.getById = (id, result) => {
   sql.query(
-    `SELECT cart.id,productid,product.name as name,quantity FROM cart join product on cart.productid = product.id WHERE cart.id = ${id}`,
+    `SELECT cart.id,productid,product.name as name,quantity,product.salesprice AS price FROM cart join product on cart.productid = product.id WHERE cart.id = ${id}`,
     (err, res) => {
       if (err) {
-        console.log("error: ", err);
         result(err, null);
         return;
       }
 
       if (res.length) {
-        console.log("ditemukan: ", res[0]);
         result(null, res[0]);
         return;
       }
@@ -51,16 +54,14 @@ Cart.getById = (id, result) => {
 
 Cart.getAll = (result) => {
   let query =
-    "SELECT cart.id,productid,product.name AS name,quantity FROM cart JOIN product ON cart.productid = product.id";
+    "SELECT cart.id,productid,product.name AS name,product.salesprice AS price,quantity FROM cart JOIN product ON cart.productid = product.id";
 
   sql.query(query, (err, res) => {
     if (err) {
-      console.log("error: ", err);
       result(null, err);
       return;
     }
 
-    console.log("cart: ", res);
     result(null, res);
   });
 };
@@ -71,7 +72,6 @@ Cart.updateById = (id, cart, result) => {
     [cart.productid, cart.quantity, cart.modified_at, id],
     (err, res) => {
       if (err) {
-        console.log("error: ", err);
         result(null, err);
         return;
       }
@@ -81,7 +81,6 @@ Cart.updateById = (id, cart, result) => {
         return;
       }
 
-      console.log("Cart Updated: ", { id: id, ...cart });
       result(null, { id: id, ...cart });
     }
   );
@@ -90,7 +89,6 @@ Cart.updateById = (id, cart, result) => {
 Cart.delete = (id, result) => {
   sql.query("DELETE FROM cart WHERE id = ?", id, (err, res) => {
     if (err) {
-      console.log("error: ", err);
       result(null, err);
       return;
     }
@@ -100,7 +98,6 @@ Cart.delete = (id, result) => {
       return;
     }
 
-    console.log("Hapus Cart by id: ", id);
     result(null, res);
   });
 };
@@ -108,11 +105,9 @@ Cart.delete = (id, result) => {
 Cart.deleteAll = (result) => {
   sql.query("DELETE FROM cart", (err, res) => {
     if (err) {
-      console.log("error: ", err);
       result(null, err);
       return;
     }
-    console.log(`deleted ${res.affectedRows} Cart`);
     result(null, res);
   });
 };
@@ -124,10 +119,14 @@ const getStock = (param, result) => {
     param.productid,
     (err, res) => {
       if (err) {
-        console.log("error: ", err);
         result(err, null);
+        return;
       }
-      result(res[0].stock);
+      if (res.length) {
+        result(null, res[0].stock);
+        return;
+      }
+      result(null, { kind: "not_found" });
     }
   );
 };

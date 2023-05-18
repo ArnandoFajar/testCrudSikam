@@ -1,6 +1,7 @@
 //Library
 const productRoutes = require("./routes/productRoutes");
 const cartRoutes = require("./routes/cartRoutes");
+const checkoutRoutes = require("./routes/checkoutRoutes");
 const express = require("express");
 const app = express();
 
@@ -14,6 +15,7 @@ app.use(express.urlencoded({ extended: true }));
 //access route
 app.use("/product", productRoutes);
 app.use("/cart", cartRoutes);
+app.use("/checkout", checkoutRoutes);
 app.get("/", (req, res) => {
   res.status(200).json({ message: "Hello World" });
 });
