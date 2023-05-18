@@ -30,7 +30,7 @@ Cart.create = (newCart, result) => {
 
 Cart.getById = (id, result) => {
   sql.query(
-    `SELECT id,productid,product.name as name,quantity FROM cart join product on cart.productid = product.id WHERE cart.id = ${id}`,
+    `SELECT cart.id,productid,product.name as name,quantity FROM cart join product on cart.productid = product.id WHERE cart.id = ${id}`,
     (err, res) => {
       if (err) {
         console.log("error: ", err);
