@@ -1,9 +1,8 @@
 const sql = require("../config/database");
-const cartModel = require("../models/cartModel");
+const amqp = require("amqplib/callback_api");
 
 //constructor
 const Checkout = function (checkout) {
-  this.productid = checkout.productid;
   this.total = checkout.total;
   this.statusorder = checkout.statusorder;
   this.amount = checkout.total;
@@ -45,54 +44,141 @@ Checkout.detailCart = (result) => {
  * setelah melakukan insert. stock di tabel product dikurangi
  * lalu truncate tabel Cart
  */
+
 Checkout.create = (newCheckout, result) => {
-  //insert paymentdetails
-  insertPayment(newCheckout, (errPayment, resPayment) => {
-    if (errPayment) {
-      result(errPayment, null);
+  amqp.connect("amqp://localhost", (err, connection) => {
+    if (err) {
+      result({ message: err, error: "connection" }, null);
       return;
     }
 
-    //insert orderdetails
-    //push value object
-    newCheckout.paymentid = resPayment;
-    insertOrderDetail(newCheckout, (errOrderDetail, resOrderDetail) => {
-      if (errOrderDetail) {
-        result(errOrderDetail, null);
+    connection.createChannel((err, channel) => {
+      if (err) {
+        result({ message: err, error: "channel" }, null);
         return;
       }
 
-      //insert orderitems
-      //push value object
-      newCheckout.orderid = resOrderDetail;
-      insertOrderItem(newCheckout, (errOrderItems, resOrderItems) => {
-        if (errOrderItems) {
-          result(errOrderItems, null);
+      const queue = "checkout_queue";
+
+      // Start transaction
+      sql.beginTransaction((errTransaction) => {
+        if (errTransaction) {
+          result({ message: errTransaction, error: "transaction" }, null);
           return;
         }
 
-        //reduce stock
-        reduceStock(newCheckout, (errReduceStock, resReduceItems) => {
-          if (errReduceStock) {
-            result(errReduceStock, null);
+        // Insert paymentdetails
+        insertPayment(newCheckout, (errPayment, resPayment) => {
+          if (errPayment) {
+            result({ message: errPayment, error: "insertpayment" }, null);
+            sql.rollback();
             return;
           }
-          //delete all Cart
-          cartModel.deleteAll();
 
-          //return result
-          result(null, { ...newCheckout });
+          // Insert orderdetails
+          // Push value object
+          newCheckout.paymentid = resPayment;
+          insertOrderDetail(newCheckout, (errOrderDetail, resOrderDetail) => {
+            if (errOrderDetail) {
+              result(
+                { message: errOrderDetail, error: "insertorderdetails" },
+                null
+              );
+              sql.rollback();
+              return;
+            }
+
+            // Insert orderitems
+            // Push value object
+            newCheckout.orderid = resOrderDetail;
+            insertOrderItem(newCheckout, (errOrderItems, resOrderItems) => {
+              if (errOrderItems) {
+                result(
+                  { message: errOrderItems, error: "insertorderitem" },
+                  null
+                );
+                sql.rollback();
+                return;
+              }
+
+              // Reduce stock
+              reduceStock(newCheckout, (errReduceStock, resReduceItems) => {
+                if (errReduceStock) {
+                  result(errReduceStock, null);
+                  sql.rollback();
+                  return;
+                }
+
+                // Delete all Cart
+                deleteAllCart((errDeleteCart, resDeleteCart) => {
+                  if (errDeleteCart) {
+                    result(
+                      { message: errDeleteCart, error: "deleteCart" },
+                      null
+                    );
+                    sql.rollback();
+                    return;
+                  }
+
+                  // Commit transaction
+                  sql.commit((errCommit) => {
+                    if (errCommit) {
+                      result({ message: errCommit, error: "commit" }, null);
+                      sql.rollback();
+                      return;
+                    }
+
+                    const checkoutData = { ...newCheckout };
+                    channel.assertQueue(queue, { durable: true });
+                    channel.sendToQueue(
+                      queue,
+                      Buffer.from(JSON.stringify(checkoutData)),
+                      {
+                        persistent: true,
+                      }
+                    );
+
+                    result(null, checkoutData);
+                  });
+                });
+              });
+            });
+          });
         });
       });
     });
   });
 };
 
-Checkout.getById = (id, result) => {};
+Checkout.getById = (id, result) => {
+  getOrderDetails(id, (errOrderDetails, resOrderDetails) => {
+    if (errOrderDetails) {
+      result({ message: errOrderDetails, error: "getOrderDetails" }, null);
+      return;
+    }
+    getOrderItems(id, (errOrderItems, resOrderItems) => {
+      if (errOrderItems) {
+        result({ message: errOrderDetails, error: "getOrderItems" }, null);
+        return;
+      }
+      if (resOrderItems.length > 0) {
+        result(null, { ...resOrderDetails[0], orderitems: resOrderItems });
+        return;
+      }
+      result({ kind: "not_found" }, null);
+    });
+  });
+};
 
-Checkout.getAll = (name, result) => {};
-
-Checkout.updatedById = (id, checkout, result) => {};
+Checkout.getAll = (result) => {
+  getOrderDetails(null, (errOrderDetails, resOrderDetails) => {
+    if (errOrderDetails) {
+      result({ message: errOrderDetails, error: "getOrderDetails" }, null);
+      return;
+    }
+    result(null, resOrderDetails);
+  });
+};
 
 Checkout.delete = (id, result) => {};
 
@@ -112,7 +198,7 @@ const insertPayment = (param, callback) => {
 
 const insertOrderDetail = (param, callback) => {
   sql.query(
-    "INSERT INTO orderdetails (total,statusorder,paymentid,created_at,modified_at) VALUES(?,?,?,?)",
+    "INSERT INTO orderdetails (total,statusorder,paymentid,created_at,modified_at) VALUES(?,?,?,?,?)",
     [
       param.total,
       param.statusorder,
@@ -135,8 +221,14 @@ const insertOrderItem = (param, callback) => {
 
   items.forEach((item, index) => {
     sql.query(
-      "INSERT INTO orderitems (orderid,productid,created_at,modified_at) VALUES(?,?,?,?)",
-      [param.orderid, item.productid, param.created_at, param.modified_at],
+      "INSERT INTO orderitems (orderid,productid,quantity,created_at,modified_at) VALUES(?,?,?,?,?)",
+      [
+        param.orderid,
+        item.productid,
+        item.quantity,
+        param.created_at,
+        param.modified_at,
+      ],
       (err, res) => {
         if (err) {
           callback(err, null);
@@ -150,7 +242,7 @@ const insertOrderItem = (param, callback) => {
 
 const totalPriceCart = (callback) => {
   sql.query(
-    "SELECT SUM(salesprice * quantity) AS totalprice FROM cart JOIN product ON cart.productid = product.id",
+    "SELECT IFNULL(SUM(salesprice * quantity),0) AS totalprice FROM cart JOIN product ON cart.productid = product.id",
     (err, res) => {
       if (err) {
         callback(err, null);
@@ -159,51 +251,164 @@ const totalPriceCart = (callback) => {
       if (res.length) {
         callback(null, res[0].totalprice);
         return;
+      } else {
+        callback(null, 0);
       }
-      callback(null, 0);
     }
   );
 };
 
-const reduceStock = (param, callback) => {
+const reduceStock = async (param, callback) => {
   const items = param.cart;
 
-  items.forEach((item, index) => {
-    let stockakhir = 0;
-    //check stok di tabel product
+  try {
+    for (let i = 0; i < items.length; i++) {
+      let stockakhir = await getStock(items[i].productid);
+      stockakhir -= items[i].quantity;
+
+      if (stockakhir <= 0) {
+        throw new Error(`Stok kurang - ${items[i].productid}`);
+      }
+
+      await updateStock(items[i].productid, stockakhir);
+    }
+
+    callback(null, true);
+  } catch (error) {
+    if (error.message.startsWith("Stok kurang")) {
+      const productid = error.message.split("-")[1].trim();
+      const productname = await getProductName(productid);
+      callback({ kind: "stok_kurang", productname }, null);
+    } else {
+      callback(error, null);
+    }
+  }
+};
+
+const getStock = (productid) => {
+  return new Promise((resolve, reject) => {
     sql.query(
       "SELECT stock FROM product WHERE id = ?",
-      item.productid,
-      (errStock, resStock) => {
-        if (errStock) {
-          callback(err, null);
-          return;
+      productid,
+      (err, res) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(res[0].stock);
         }
-        //menghitung sisa stock
-        stockakhir = resStock[0].stock - item.quantity;
-
-        //update stock
-        sql.query(
-          "UPDATE product SET stock = ? WHERE id = ?",
-          [stockakhir, item.productid],
-          (err, res) => {
-            if (err) {
-              callback(err, null);
-              return;
-            }
-
-            if (res.affectedRows == 0) {
-              callback({ kind: "not_found" }, null);
-              return;
-            }
-
-            callback(null, true);
-          }
-        );
       }
     );
   });
-  callback(null, true);
 };
 
+const updateStock = (productid, stockakhir) => {
+  return new Promise((resolve, reject) => {
+    sql.query(
+      "UPDATE product SET stock = ? WHERE id = ?",
+      [stockakhir, productid],
+      (err, res) => {
+        if (err) {
+          reject(err);
+        } else {
+          if (res.affectedRows === 0) {
+            reject({ kind: "not_found" });
+          } else {
+            resolve();
+          }
+        }
+      }
+    );
+  });
+};
+
+const getProductName = (productid) => {
+  return new Promise((resolve, reject) => {
+    sql.query(
+      "SELECT name FROM product WHERE id = ?",
+      productid,
+      (err, res) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(res[0].name);
+        }
+      }
+    );
+  });
+};
+
+const getOrderDetails = (id, callback) => {
+  if (id === null) {
+    sql.query(
+      "SELECT orderdetails.id,total,statusorder,amount,statuspayment FROM orderdetails JOIN paymentdetails ON orderdetails.paymentid = paymentdetails.id WHERE statusorder='menunggupembayaran' ORDER BY orderdetails.id ASC",
+      (err, res) => {
+        if (err) {
+          callback(err, null);
+          return;
+        }
+        callback(null, res);
+        return;
+      }
+    );
+  } else {
+    sql.query(
+      "SELECT orderdetails.id,total,statusorder,amount,statuspayment FROM orderdetails JOIN paymentdetails ON orderdetails.paymentid = paymentdetails.id WHERE orderdetails.id = ? ORDER BY orderdetails.id ASC",
+      id,
+      (err, res) => {
+        if (err) {
+          callback(err, null);
+          return;
+        }
+        callback(null, res);
+        return;
+      }
+    );
+  }
+};
+const getOrderItems = (orderid, callback) => {
+  sql.query(
+    "SELECT orderitems.id,productid,product.name,quantity,product.salesprice AS price, (product.salesprice * quantity) AS totalprice FROM orderitems JOIN product ON orderitems.productid = product.id WHERE orderid = ? ORDER BY orderitems.id ASC",
+    orderid,
+    (err, res) => {
+      if (err) {
+        callback(err, null);
+        return;
+      }
+      callback(null, res);
+      return;
+    }
+  );
+};
+
+const deletePayment = (id, callback) => {
+  sql.query("DELETE FROM paymentdetails WHERE id = ?", id, (err, res) => {
+    if (err) {
+      callback(err, null);
+      return;
+    }
+    callback(null, true);
+    return;
+  });
+};
+
+const deleteOrderItems = (orderid, callback) => {
+  sql.query("DELETE FROM orderitems WHERE orderid = ?", orderid, (err, res) => {
+    if (err) {
+      callback(err, null);
+      return;
+    }
+    callback(null, true);
+    return;
+  });
+};
+
+const deleteAllCart = (callback) => {
+  sql.query("DELETE FROM cart", (err, res) => {
+    if (err) {
+      callback(err, null);
+      return;
+    }
+    callback(null, res);
+  });
+};
 module.exports = Checkout;

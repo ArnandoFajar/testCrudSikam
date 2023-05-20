@@ -105,7 +105,7 @@ Cart.delete = (id, result) => {
 Cart.deleteAll = (result) => {
   sql.query("DELETE FROM cart", (err, res) => {
     if (err) {
-      result(null, err);
+      result(err, null);
       return;
     }
     result(null, res);
