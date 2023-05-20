@@ -39,3 +39,9 @@ test_sikam.sql
    untuk melihat message queue pada checkout
 6. index.js
    file pertama yang dijalankan untuk mengaktifkan server
+
+**Pertama Penggunaan**
+
+jalankan ke terminal ketik :
+
+> yarn install
