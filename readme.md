@@ -24,3 +24,18 @@ https://blue-crescent-424557.postman.co/workspace/API-TEST~92e73999-b17a-4d89-be
 **Database** 
 
 test_sikam.sql
+
+**Penjelasan File**
+
+1. Folder server/config
+   didalam ini ada file pengaturan koneksi ke database
+2. Folder server/controller
+   didalam folder controller terdapat file js untuk terhubung antara view(routes) dengan Model
+3. Folder server/Models
+   didalam folder ini terdapat file js yang berkomunikasi langsung dengan tabel di database
+4. Folder server/Routes
+   didalam folder ini pengaturan untuk get link api yang mengarahkan controller mana yang akan dituju
+5. consumeCheckout.js
+   untuk melihat message queue pada checkout
+6. index.js
+   file pertama yang dijalankan untuk mengaktifkan server
