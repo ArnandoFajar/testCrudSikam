@@ -29,26 +29,6 @@ CREATE TABLE `cart` (
 
 /*Data for the table `cart` */
 
-/*Table structure for table `inventory` */
-
-DROP TABLE IF EXISTS `inventory`;
-
-CREATE TABLE `inventory` (
-  `id` int(30) NOT NULL AUTO_INCREMENT,
-  `transid` varchar(30) DEFAULT NULL,
-  `transdate` datetime DEFAULT NULL,
-  `productid` int(30) DEFAULT NULL,
-  `invin` double DEFAULT NULL,
-  `invout` double DEFAULT NULL,
-  `memo` text,
-  `created_at` timestamp NULL DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `productid` (`productid`),
-  CONSTRAINT `inventory_ibfk_1` FOREIGN KEY (`productid`) REFERENCES `product` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
-
-/*Data for the table `inventory` */
-
 /*Table structure for table `orderdetails` */
 
 DROP TABLE IF EXISTS `orderdetails`;
