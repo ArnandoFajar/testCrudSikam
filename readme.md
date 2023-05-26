@@ -53,4 +53,11 @@ ketik diterminal untuk menginstall package dependency :
 lalu jalankan ini :
 
 > yarn server
->
+
+**Cara Import database:**
+
+1. Buatlah database dengan nama test_sikam jika menggunakan PhpMyAdmin
+2. Setelah itu klik import
+3. Insert file test_sikam.sql
+4. setelah itu un-check pada check forign key supaya tidak error
+5. klik impor
